@@ -31,3 +31,12 @@ def print_board(board):
         print(f"{bump}{row} {''.join(line)}")
         #print('%s%d %s' % (bump, row, ''.join(line)))
     print('    ' + '  '.join(COLS[:board.num_cols]))
+
+
+def point_from_coords(coords):
+    """
+    Transforms human input to Point object
+    """
+    col = COLS.index(coords[0]) + 1
+    row = int(coords[1:])
+    return gotypes.Point(row=row, col=col)
