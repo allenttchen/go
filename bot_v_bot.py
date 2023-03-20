@@ -10,8 +10,8 @@ def main():
     game = goboard.GameState.new_game(board_size)
     bots = {
         gotypes.Player.black: agent.RandomBot(),
-        #gotypes.Player.white: agent.RandomBot(),
-        gotypes.Player.white: mcts.MCTSAgent(num_rounds=10, temperature=1.5),
+        gotypes.Player.white: agent.RandomBot(),
+        #gotypes.Player.white: mcts.MCTSAgent(num_rounds=10, temperature=1.5),
     }
     print_board(game.board)
     while not game.is_over():
