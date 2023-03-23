@@ -3,6 +3,8 @@ import tarfile
 import gzip
 import glob
 import shutil
+import multiprocessing
+import sys
 
 import numpy as np
 from keras.utils import to_categorical
@@ -12,7 +14,15 @@ from dlgo.gotypes import Player, Point
 from dlgo.encoders.base import get_encoder_by_name
 from dlgo.preprocessing.index_processor import KGSIndex
 from dlgo.preprocessing.sampling import Sampler
+from dlgo.preprocessing.generator import DataGenerator
 
+
+def worker(jobinfo):
+    try:
+        clazz, encoder, zip_file, data_file_name, game_list = jobinfo
+        clazz(encoder=encoder).process_zip(zip_file, data_file_name, game_list)
+    except (KeyboardInterrupt, SystemExit):
+        raise Exception('>>> Exiting child process.')
 
 class GoDataProcessor:
     def __init__(
@@ -21,18 +31,51 @@ class GoDataProcessor:
         index_page='./records/kgs/kgs_index.html',
         data_directory='./records/kgs/data'
     ):
+        self.encoder_string = encoder
         self.encoder = get_encoder_by_name(encoder, 19)
         self.index_page = index_page
         self.data_dir = data_directory
 
-    def load_go_data(self, data_type='train', num_samples=1000):
+    def load_go_data(
+        self,
+        data_type='train',
+        num_sample_games=1000,
+        use_generator=False,
+    ):
+        """
+        In a parallel fashion, create features and labels .npy files from downloaded .tar.gz files
+        Main method to get X and y
+        """
         # download data from KGS
         index = KGSIndex(index_page=self.index_page, data_directory=self.data_dir)
         index.download_files()
 
         # sample data
         sampler = Sampler(data_dir=self.data_dir)
-        data = sampler.draw_data(data_type, num_samples)
+        data = sampler.draw_data(data_type, num_sample_games)
+
+        # Parallelize game extraction from zip files
+        self.map_to_workers(data_type, data)
+
+        # use generator or load everything at once
+        if use_generator:
+            generator = DataGenerator(self.data_dir, data)
+            return generator
+        else:
+            features_and_labels = self.consolidate_games(data_type, data)
+            return features_and_labels
+
+    def load_go_data_sequentially(self, data_type='train', num_sample_games=1000):
+        """
+        In an non-parallel fashion, create features and labels .npy files from downloaded .tar.gz files
+        """
+        # download data from KGS
+        index = KGSIndex(index_page=self.index_page, data_directory=self.data_dir)
+        index.download_files()
+
+        # sample data
+        sampler = Sampler(data_dir=self.data_dir)
+        data = sampler.draw_data(data_type, num_sample_games)
 
         # create mapping filename: the list of indices
         zip_names = set()
@@ -182,3 +225,38 @@ class GoDataProcessor:
             else:
                 raise ValueError(name + ' is not a valid sgf')
         return total_examples
+
+    def map_to_workers(self, data_type, samples):
+        """
+        Intermediate method that distribute game extraction from zipped files work to workers
+        Args:
+            data_type: 'train' or 'test'
+            samples: A list of tuples (file_name, game_index)
+        """
+        # Create a mapping of each filename to a list of game_index
+        zip_names = set()
+        indices_by_zip_name = {}
+        for filename, index in samples:
+            zip_names.add(filename)
+            if filename not in indices_by_zip_name:
+                indices_by_zip_name[filename] = []
+            indices_by_zip_name[filename].append(index)
+
+        # prepare a list of jobs
+        zips_to_process = []
+        for zip_name in zip_names:
+            base_name = zip_name.replace('.tar.gz', '')
+            data_file_name = base_name + data_type
+            zips_to_process.append(
+                (self.__class__, self.encoder_string, zip_name, data_file_name, indices_by_zip_name[zip_name])
+            )
+
+        cores = multiprocessing.cpu_count()
+        pool = multiprocessing.Pool(processes=cores)
+        p = pool.map_async(worker, zips_to_process)
+        try:
+            _ = p.get()
+        except KeyboardInterrupt:
+            pool.terminate()
+            pool.join()
+            sys.exit(-1)
