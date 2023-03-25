@@ -4,6 +4,8 @@ import multiprocessing
 import six
 from urllib.request import urlopen, urlretrieve
 
+from constants import KGS_INDEX
+
 
 def worker(url_and_target):
     try:
@@ -17,9 +19,9 @@ def worker(url_and_target):
 class KGSIndex:
     def __init__(
         self,
+        data_directory,
+        index_page=KGS_INDEX,
         kgs_url='http://u-go.net/gamerecords/',
-        index_page='kgs_index.html',
-        data_directory='data',
     ):
         """
         Create an index of zip files containing SGF data of actual Go Games on KGS

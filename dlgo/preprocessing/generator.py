@@ -4,8 +4,8 @@ from keras.utils import to_categorical
 
 
 class DataGenerator:
-    def __init__(self, data_directory, samples):
-        self.data_directory = data_directory
+    def __init__(self, train_data_dir, samples):
+        self.train_data_dir = train_data_dir
         self.samples = samples
         self.files = set(file_name for file_name, index in samples)
         self.num_samples = None # number of moves
@@ -29,7 +29,7 @@ class DataGenerator:
         # iterate through each file from samples
         for zip_file_name in self.files:
             file_name = zip_file_name.replace('.tar.gz', '') + 'train'
-            base = self.data_directory + '/' + file_name + '_features_*.npy'
+            base = self.train_data_dir + '/' + file_name + '_features_*.npy'
             # iterate through each game
             for feature_file in glob.glob(base):
                 label_file = feature_file.replace('features', 'labels')
@@ -49,4 +49,3 @@ class DataGenerator:
         while True:
             for item in self._generate(batch_size, num_classes):
                 yield item
-

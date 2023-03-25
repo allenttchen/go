@@ -1,6 +1,4 @@
-import sys
-sys.path.append('..')
-# is there a better way to not do this?
+import os
 
 from dlgo.preprocessing.processor import GoDataProcessor
 from dlgo.encoders.oneplane import OnePlaneEncoder
@@ -9,21 +7,24 @@ from keras.models import Sequential
 from keras.layers.core import Dense
 from keras.callbacks import ModelCheckpoint
 import tensorflow as tf
-
+from constants import ROOT_DIR
 
 if __name__ == '__main__':
 
-    print(tf.config.list_physical_devices())
+    print(tf.config.list_physical_devices('GPU'))
     go_board_rows, go_board_cols = 19, 19
     num_classes = go_board_rows * go_board_cols
     num_sample_games = 100
+    data_dir = os.path.join(ROOT_DIR, "records/kgs/data")
+    exp_dir = os.path.join(ROOT_DIR, "experiments/small_cnn_001")
+    if not os.path.exists(exp_dir):
+        os.makedirs(exp_dir)
 
     encoder = OnePlaneEncoder((go_board_rows, go_board_cols))
-    # TODO: Set all paths as parameters (kgs_index.html and test_Samples.py)
     processor = GoDataProcessor(
         encoder=encoder.name(),
-        index_page='../records/kgs/kgs_index.html',
-        data_directory='../records/kgs/data'
+        data_dir=data_dir,
+        exp_dir=exp_dir,
     )
     train_generator = processor.load_go_data('train', num_sample_games, use_generator=True)
     test_generator = processor.load_go_data('test', num_sample_games, use_generator=True)
@@ -42,13 +43,14 @@ if __name__ == '__main__':
 
     epochs = 5
     batch_size = 128
-    model.fit_generator(
-        generator=train_generator.generate(batch_size, num_classes),
+    model.fit(
+        x=train_generator.generate(batch_size, num_classes),
         epochs=epochs,
         steps_per_epoch=train_generator.get_num_samples() / batch_size,
         validation_data=test_generator.generate(batch_size, num_classes),
+        verbose=2,
         callbacks=[
-            ModelCheckpoint('./checkpoints/small_cnn_epoch_{epoch}.h5')
+            ModelCheckpoint(os.path.join(exp_dir, 'checkpoints/small_cnn_epoch_{epoch}.h5'))
         ]
     )
 

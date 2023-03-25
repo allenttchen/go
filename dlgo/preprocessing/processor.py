@@ -15,26 +15,40 @@ from dlgo.encoders.base import get_encoder_by_name
 from dlgo.preprocessing.index_processor import KGSIndex
 from dlgo.preprocessing.sampling import Sampler
 from dlgo.preprocessing.generator import DataGenerator
+from constants import KGS_INDEX
 
 
 def worker(jobinfo):
     try:
-        clazz, encoder, zip_file, data_file_name, game_list = jobinfo
-        clazz(encoder=encoder).process_zip(zip_file, data_file_name, game_list)
+        clazz, data_dir, exp_dir, encoder, zip_file, data_file_name, game_list = jobinfo
+        (
+            clazz(data_dir=data_dir, exp_dir=exp_dir, encoder=encoder)
+            .process_zip(zip_file, data_file_name, game_list)
+        )
+
     except (KeyboardInterrupt, SystemExit):
         raise Exception('>>> Exiting child process.')
 
+
 class GoDataProcessor:
+    """
+    Preprocessing pipeline from raw data to trains and labels numpy array or generators
+    """
     def __init__(
         self,
+        data_dir,
+        exp_dir,
+        index_page=KGS_INDEX,
         encoder='oneplane',
-        index_page='./records/kgs/kgs_index.html',
-        data_directory='./records/kgs/data'
     ):
         self.encoder_string = encoder
         self.encoder = get_encoder_by_name(encoder, 19)
         self.index_page = index_page
-        self.data_dir = data_directory
+        self.data_dir = data_dir
+        self.exp_dir = exp_dir
+        self.train_data_dir = os.path.join(self.exp_dir, "train")
+        if not os.path.exists(self.train_data_dir):
+            os.makedirs(self.train_data_dir)
 
     def load_go_data(
         self,
@@ -47,11 +61,11 @@ class GoDataProcessor:
         Main method to get X and y
         """
         # download data from KGS
-        index = KGSIndex(index_page=self.index_page, data_directory=self.data_dir)
+        index = KGSIndex(data_directory=self.data_dir, index_page=self.index_page)
         index.download_files()
 
         # sample data
-        sampler = Sampler(data_dir=self.data_dir)
+        sampler = Sampler(data_dir=self.data_dir, exp_dir=self.exp_dir)
         data = sampler.draw_data(data_type, num_sample_games)
 
         # Parallelize game extraction from zip files
@@ -59,7 +73,7 @@ class GoDataProcessor:
 
         # use generator or load everything at once
         if use_generator:
-            generator = DataGenerator(self.data_dir, data)
+            generator = DataGenerator(self.train_data_dir, data)
             return generator
         else:
             features_and_labels = self.consolidate_games(data_type, data)
@@ -70,11 +84,11 @@ class GoDataProcessor:
         In an non-parallel fashion, create features and labels .npy files from downloaded .tar.gz files
         """
         # download data from KGS
-        index = KGSIndex(index_page=self.index_page, data_directory=self.data_dir)
+        index = KGSIndex(data_directory=self.data_dir, index_page=self.index_page)
         index.download_files()
 
         # sample data
-        sampler = Sampler(data_dir=self.data_dir)
+        sampler = Sampler(data_dir=self.data_dir, exp_dir=self.exp_dir)
         data = sampler.draw_data(data_type, num_sample_games)
 
         # create mapping filename: the list of indices
@@ -148,8 +162,8 @@ class GoDataProcessor:
                     game_state = game_state.apply_move(move)
                     first_move_done = True
 
-        feature_file_base = self.data_dir + '/' + data_file_name + '_features_%d'
-        label_file_base = self.data_dir + '/' + data_file_name + '_labels_%d'
+        feature_file_base = self.train_data_dir + '/' + data_file_name + '_features_%d'
+        label_file_base = self.train_data_dir + '/' + data_file_name + '_labels_%d'
 
         # Due to files with large content, split up after chunksize
         chunk = 0
@@ -174,7 +188,7 @@ class GoDataProcessor:
         label_list = []
         for file_name in file_names:
             file_prefix = file_name.replace('.tar.gz', '')
-            base = self.data_dir + '/' + file_prefix + '_features_*.npy'
+            base = self.train_data_dir + '/' + file_prefix + '_features_*.npy'
             for feature_file in glob.glob(base):
                 label_file = feature_file.replace('features', 'labels')
                 x = np.load(feature_file)
@@ -185,8 +199,8 @@ class GoDataProcessor:
                 label_list.append(y)
         features = np.concatenate(feature_list, axis=0)
         labels = np.concatenate(label_list, axis=0)
-        np.save('{}/features_{}.npy'.format(self.data_dir, data_type), features)
-        np.save('{}/labels_{}.npy'.format(self.data_dir, data_type), labels)
+        np.save('{}/features_{}.npy'.format(self.train_data_dir, data_type), features)
+        np.save('{}/labels_{}.npy'.format(self.train_data_dir, data_type), labels)
 
         return features, labels
 
@@ -248,7 +262,15 @@ class GoDataProcessor:
             base_name = zip_name.replace('.tar.gz', '')
             data_file_name = base_name + data_type
             zips_to_process.append(
-                (self.__class__, self.encoder_string, zip_name, data_file_name, indices_by_zip_name[zip_name])
+                (
+                    self.__class__,
+                    self.data_dir,
+                    self.exp_dir,
+                    self.encoder_string,
+                    zip_name,
+                    data_file_name,
+                    indices_by_zip_name[zip_name]
+                )
             )
 
         cores = multiprocessing.cpu_count()

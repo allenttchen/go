@@ -5,12 +5,19 @@ from dlgo.preprocessing.index_processor import KGSIndex
 
 class Sampler:
     """Sample training and test data from zipped sgf files such that test data is kept stable."""
-    def __init__(self, data_dir='data', num_test_games=100, cap_year=2015, seed=1337):
+    def __init__(
+        self,
+        data_dir,
+        exp_dir,
+        num_test_games=100,
+        cap_year=2015,
+        seed=1337
+    ):
         self.data_dir = data_dir
         self.num_test_games = num_test_games
         self.test_games = []
         self.train_games = []
-        self.test_folder = 'test_samples.py'
+        self.test_file_path = os.path.join(exp_dir, "test_samples.py")
         self.cap_year = cap_year
 
         random.seed(seed)
@@ -68,14 +75,14 @@ class Sampler:
 
     def compute_test_samples(self):
         """If not already existing, create local file to store fixed set of test samples"""
-        if not os.path.isfile(self.test_folder):
+        if not os.path.isfile(self.test_file_path):
             test_games = self.draw_samples(self.num_test_games)
-            test_sample_file = open(self.test_folder, 'w')
+            test_sample_file = open(self.test_file_path, 'w')
             for sample in test_games:
                 test_sample_file.write(str(sample) + "\n")
             test_sample_file.close()
 
-        test_sample_file = open(self.test_folder, 'r')
+        test_sample_file = open(self.test_file_path, 'r')
         sample_contents = test_sample_file.read()
         test_sample_file.close()
         for line in sample_contents.split('\n'):

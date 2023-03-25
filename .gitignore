@@ -1,1 +1,7 @@
 .idea/
+build/
+dist/
+dlgo.egg-info/
+__pycache__/
+records/
+experiments/
