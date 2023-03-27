@@ -40,10 +40,12 @@ class GoDataProcessor:
         exp_dir,
         index_page=KGS_INDEX,
         encoder='oneplane',
+        seed=1337,
     ):
         self.encoder_string = encoder
         self.encoder = get_encoder_by_name(encoder, 19)
         self.index_page = index_page
+        self.seed = seed
         self.data_dir = data_dir
         self.exp_dir = exp_dir
         self.train_data_dir = os.path.join(self.exp_dir, "train")
@@ -65,11 +67,12 @@ class GoDataProcessor:
         index.download_files()
 
         # sample data
-        sampler = Sampler(data_dir=self.data_dir, exp_dir=self.exp_dir)
+        sampler = Sampler(data_dir=self.data_dir, exp_dir=self.exp_dir, seed=self.seed)
         data = sampler.draw_data(data_type, num_sample_games)
 
         # Parallelize game extraction from zip files
-        self.map_to_workers(data_type, data)
+        if len(os.listdir(self.train_data_dir)) == 0:
+            self.map_to_workers(data_type, data)
 
         # use generator or load everything at once
         if use_generator:

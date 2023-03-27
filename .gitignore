@@ -5,3 +5,4 @@ dlgo.egg-info/
 __pycache__/
 records/
 experiments/
+.ipynb_checkpoints

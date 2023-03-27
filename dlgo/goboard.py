@@ -5,7 +5,7 @@ from dlgo import zobrist
 from .scoring import compute_game_result
 
 
-class Move():
+class Move:
     """
     A player can either place a stone, move, or resign
     """

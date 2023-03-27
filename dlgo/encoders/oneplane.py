@@ -30,7 +30,7 @@ class OnePlaneEncoder(Encoder):
     def encode_point(self, point):
         """
         Turns a board point into an integer index
-        Ex. board size: 9X9 -> play D3 -> P(r=3, c=4) -> 9*2 + 4 - 1 -> 21
+        Ex. board size: 9X9 -> play D3 -> P(r=3, c=4) -> 9*(3-1) + 4 - 1 -> 21
         """
         return self.board_width * (point.row - 1) + point.col - 1
 
