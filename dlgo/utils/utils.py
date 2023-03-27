@@ -48,6 +48,13 @@ def point_from_coords(coords):
     return gotypes.Point(row=row, col=col)
 
 
+def coords_from_point(point):
+    return '%s%d' % (
+        COLS[point.col - 1],
+        point.row
+    )
+
+
 def print_board_from_lists(board: list[list[float]]):
     num_rows, num_cols = len(board), len(board[0])
     for row in range(num_rows-1, -1, -1):
