@@ -20,9 +20,9 @@ from constants import KGS_INDEX
 
 def worker(jobinfo):
     try:
-        clazz, data_dir, exp_dir, encoder, zip_file, data_file_name, game_list = jobinfo
+        clazz, raw_data_dir, exp_dir, train_data_dir, encoder, zip_file, data_file_name, game_list = jobinfo
         (
-            clazz(data_dir=data_dir, exp_dir=exp_dir, encoder=encoder)
+            clazz(raw_data_dir=raw_data_dir, exp_dir=exp_dir, train_data_dir=train_data_dir, encoder=encoder)
             .process_zip(zip_file, data_file_name, game_list)
         )
 
@@ -36,8 +36,9 @@ class GoDataProcessor:
     """
     def __init__(
         self,
-        data_dir,
+        raw_data_dir,
         exp_dir,
+        train_data_dir,
         index_page=KGS_INDEX,
         encoder='oneplane',
         seed=1337,
@@ -46,11 +47,9 @@ class GoDataProcessor:
         self.encoder = get_encoder_by_name(encoder, 19)
         self.index_page = index_page
         self.seed = seed
-        self.data_dir = data_dir
+        self.raw_data_dir = raw_data_dir
         self.exp_dir = exp_dir
-        self.train_data_dir = os.path.join(self.exp_dir, "train")
-        if not os.path.exists(self.train_data_dir):
-            os.makedirs(self.train_data_dir)
+        self.train_data_dir = train_data_dir
 
     def load_go_data(
         self,
@@ -63,11 +62,11 @@ class GoDataProcessor:
         Main method to get X and y
         """
         # download data from KGS
-        index = KGSIndex(data_directory=self.data_dir, index_page=self.index_page)
+        index = KGSIndex(data_directory=self.raw_data_dir, index_page=self.index_page)
         index.download_files()
 
         # sample data
-        sampler = Sampler(data_dir=self.data_dir, exp_dir=self.exp_dir, seed=self.seed)
+        sampler = Sampler(raw_data_dir=self.raw_data_dir, exp_dir=self.exp_dir, seed=self.seed)
         data = sampler.draw_data(data_type, num_sample_games)
 
         # Parallelize game extraction from zip files
@@ -87,11 +86,11 @@ class GoDataProcessor:
         In an non-parallel fashion, create features and labels .npy files from downloaded .tar.gz files
         """
         # download data from KGS
-        index = KGSIndex(data_directory=self.data_dir, index_page=self.index_page)
+        index = KGSIndex(data_directory=self.raw_data_dir, index_page=self.index_page)
         index.download_files()
 
         # sample data
-        sampler = Sampler(data_dir=self.data_dir, exp_dir=self.exp_dir)
+        sampler = Sampler(raw_data_dir=self.raw_data_dir, exp_dir=self.exp_dir)
         data = sampler.draw_data(data_type, num_sample_games)
 
         # create mapping filename: the list of indices
@@ -107,17 +106,17 @@ class GoDataProcessor:
         for zip_name in zip_names:
             base_name = zip_name.replace('.tar.gz', '')
             data_file_name = base_name + data_type
-            if not os.path.isfile(self.data_dir + '/' + data_file_name):
+            if not os.path.isfile(self.raw_data_dir + '/' + data_file_name):
                 self.process_zip(zip_name, data_file_name, indices_by_zip_names[zip_name])
 
         features_and_labels = self.consolidate_games(data_type, data)
         return features_and_labels
 
     def unzip_data(self, zip_file_name):
-        this_gz = gzip.open(self.data_dir + '/' + zip_file_name)
+        this_gz = gzip.open(self.raw_data_dir + '/' + zip_file_name)
 
         tar_file = zip_file_name[0:-3]
-        this_tar = open(self.data_dir + '/' + tar_file, 'wb')
+        this_tar = open(self.raw_data_dir + '/' + tar_file, 'wb')
 
         shutil.copyfileobj(this_gz, this_tar)
         this_tar.close()
@@ -125,7 +124,7 @@ class GoDataProcessor:
 
     def process_zip(self, zip_file_name, data_file_name, game_list):
         tar_file = self.unzip_data(zip_file_name)
-        zip_file = tarfile.open(self.data_dir + '/' + tar_file)
+        zip_file = tarfile.open(self.raw_data_dir + '/' + tar_file)
         name_list = zip_file.getnames()
         # Get total number of moves in this zip file
         total_examples = self.num_total_examples(zip_file, game_list, name_list)
@@ -267,8 +266,9 @@ class GoDataProcessor:
             zips_to_process.append(
                 (
                     self.__class__,
-                    self.data_dir,
+                    self.raw_data_dir,
                     self.exp_dir,
+                    self.train_data_dir,
                     self.encoder_string,
                     zip_name,
                     data_file_name,

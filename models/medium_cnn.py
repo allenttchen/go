@@ -1,5 +1,5 @@
 """
-Script to train Small Neural Net Locally
+Script to train Medium Neural Net Locally
 """
 import os
 
@@ -8,7 +8,7 @@ from dlgo.preprocessing.processor import GoDataProcessor
 from dlgo.encoders.oneplane import OnePlaneEncoder
 from dlgo.encoders.sevenplane import SevenPlaneEncoder
 from dlgo.encoders.simple import SimpleEncoder
-from dlgo.networks import small
+from dlgo.networks import medium
 from dlgo.agent.predict import DeepLearningAgent
 from keras.models import Sequential
 from keras.layers.core import Dense
@@ -26,10 +26,10 @@ if __name__ == '__main__':
     num_classes = go_board_rows * go_board_cols
     num_sample_games = 3000
     encoder_name = "oneplane"
-    bot_name = f"AI_small_{encoder_name}_{num_sample_games}_bot"
+    bot_name = f"AI_medium_{encoder_name}_{num_sample_games}_bot"
     raw_data_dir = os.path.join(ROOT_DIR, "records/kgs/data")
     train_data_dir = os.path.join(ROOT_DIR, f"records/encoded/train_{encoder_name}_{num_sample_games}")
-    exp_dir = os.path.join(ROOT_DIR, "experiments/small_cnn_008")
+    exp_dir = os.path.join(ROOT_DIR, "experiments/medium_cnn_001")
     if not os.path.exists(exp_dir):
         os.makedirs(exp_dir)
         os.makedirs(os.path.join(exp_dir, "checkpoints"))
@@ -37,8 +37,8 @@ if __name__ == '__main__':
         os.makedirs(train_data_dir)
 
     # Preprocessing pipeline
-    #encoder = OnePlaneEncoder((go_board_rows, go_board_cols))
-    encoder = SimpleEncoder((go_board_rows, go_board_cols))
+    encoder = OnePlaneEncoder((go_board_rows, go_board_cols))
+    #encoder = SimpleEncoder((go_board_rows, go_board_cols))
     processor = GoDataProcessor(
         encoder=encoder.name(),
         raw_data_dir=raw_data_dir,
@@ -50,7 +50,7 @@ if __name__ == '__main__':
 
     # Define Model
     input_shape = (encoder.num_planes, go_board_rows, go_board_cols)
-    network_layers = small.layers(input_shape)
+    network_layers = medium.layers(input_shape)
     model = Sequential()
     for layer in network_layers:
         model.add(layer)
@@ -74,7 +74,7 @@ if __name__ == '__main__':
         validation_steps=int(test_generator.get_num_samples() // batch_size),
         verbose=1,
         callbacks=[
-            ModelCheckpoint(os.path.join(exp_dir, 'checkpoints/small_cnn_epoch_{epoch}.h5'))
+            ModelCheckpoint(os.path.join(exp_dir, 'checkpoints/medium_cnn_epoch_{epoch}.h5'))
         ]
     )
 
@@ -86,6 +86,12 @@ if __name__ == '__main__':
     model.summary(show_trainable=True)
 
     # Save Model Agent
+    from keras.models import load_model
+    model_path = os.path.join(ROOT_DIR, "experiments/medium_cnn_001/checkpoints/medium_cnn_epoch_10.h5")
+    model = load_model(model_path)
+    go_board_rows, go_board_cols = 19, 19
+    encoder = OnePlaneEncoder((go_board_rows, go_board_cols))
+
     agent = DeepLearningAgent(model, encoder)
     agent_path = os.path.join(exp_dir, f"{bot_name}.h5")
     agent_file = h5py.File(agent_path, "a")

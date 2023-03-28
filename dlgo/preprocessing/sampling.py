@@ -7,13 +7,13 @@ class Sampler:
     """Sample training and test data from zipped sgf files such that test data is kept stable."""
     def __init__(
         self,
-        data_dir,
+        raw_data_dir,
         exp_dir,
         num_test_games=100,
         cap_year=2015,
         seed=1337
     ):
-        self.data_dir = data_dir
+        self.raw_data_dir = raw_data_dir
         self.num_test_games = num_test_games
         self.test_games = []
         self.train_games = []
@@ -36,7 +36,7 @@ class Sampler:
     def draw_samples(self, num_sample_games):
         """Draw num_sample_games many training games from index."""
         available_games = []
-        index = KGSIndex(data_directory=self.data_dir)
+        index = KGSIndex(data_directory=self.raw_data_dir)
 
         for fileinfo in index.file_info:
             filename = fileinfo['filename']
@@ -60,7 +60,7 @@ class Sampler:
         """Get list of all non-test games, that are no later than dec 2014
         Ignore games after cap_year to keep training data stable
         """
-        index = KGSIndex(data_directory=self.data_dir)
+        index = KGSIndex(data_directory=self.raw_data_dir)
         for file_info in index.file_info:
             filename = file_info['filename']
             year = int(filename.split('-')[1].split('_')[0])
@@ -93,7 +93,7 @@ class Sampler:
     def draw_training_samples(self, num_sample_games):
         """Draw training games, not overlapping with any of the test games."""
         available_games = []
-        index = KGSIndex(data_directory=self.data_dir)
+        index = KGSIndex(data_directory=self.raw_data_dir)
         for fileinfo in index.file_info:
             filename = fileinfo['filename']
             year = int(filename.split('-')[1].split('_')[0])
@@ -115,7 +115,7 @@ class Sampler:
     def draw_all_training(self):
         """Draw all available training games."""
         available_games = []
-        index = KGSIndex(data_directory=self.data_dir)
+        index = KGSIndex(data_directory=self.raw_data_dir)
 
         for fileinfo in index.file_info:
             filename = fileinfo['filename']
