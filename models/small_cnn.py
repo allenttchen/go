@@ -37,8 +37,8 @@ if __name__ == '__main__':
         os.makedirs(train_data_dir)
 
     # Preprocessing pipeline
-    #encoder = OnePlaneEncoder((go_board_rows, go_board_cols))
-    encoder = SimpleEncoder((go_board_rows, go_board_cols))
+    encoder = OnePlaneEncoder((go_board_rows, go_board_cols))
+    #encoder = SimpleEncoder((go_board_rows, go_board_cols))
     processor = GoDataProcessor(
         encoder=encoder.name(),
         raw_data_dir=raw_data_dir,
