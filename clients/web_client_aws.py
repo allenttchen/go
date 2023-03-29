@@ -12,14 +12,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--bind-address', default='127.0.0.1')
     parser.add_argument('--port', '-p', type=int, default=5000)
-    #parser.add_argument('--pg-agent')
-    #parser.add_argument('--predict-agent')
-    #parser.add_argument('--q-agent')
-    #parser.add_argument('--ac-agent')
+    parser.add_argument('--pg-agent')
+    parser.add_argument('--predict-agent')
+    parser.add_argument('--q-agent')
+    parser.add_argument('--ac-agent')
 
     args = parser.parse_args()
 
-    agent_file = h5py.File(os.path.join(ROOT_DIR, "experiments/large_cnn_001/AI_large_simple_3000_bot.h5"), "r")
+    agent_file = h5py.File(os.path.join(ROOT_DIR, args.predict_agent), "r")
     agent = load_prediction_agent(agent_file)
     bots = {
         'predict': agent
