@@ -6,3 +6,6 @@ __pycache__/
 records/
 experiments/
 .ipynb_checkpoints
+.DS_Store
+bot/*.h5
+play/experience
