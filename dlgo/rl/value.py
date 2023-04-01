@@ -2,33 +2,33 @@ import numpy as np
 
 from keras.optimizers import SGD
 
-from dlgo import encoders, goboard
+from dlgo import encoders
+from dlgo import goboard
 from dlgo.utils import kerasutil
 from dlgo.agent import Agent
 from dlgo.agent.helpers import is_point_an_eye
 
+__all__ = [
+    'ValueAgent',
+    'load_value_agent',
+]
 
-class QAgent(Agent):
+
+class ValueAgent(Agent):
     def __init__(self, model, encoder, policy='eps-greedy'):
-        """
-        Action-Value Agent
-        The model has 2 inputs and 1 output.
-        The inputs are the encoded board state and proposed move vector.
-        The output is the value of the move. Training label here is the game outcome (1 for win, -1 for loss)
-        Args:
-            model: action-value model
-            encoder: board encoder
-            collector: experience collector
-            temperature: episilon value controlling how randomized the policy is
-            policy: how moves are ranked
-        """
         Agent.__init__(self)
         self.model = model
         self.encoder = encoder
         self.collector = None
         self.temperature = 0.0
         self.policy = policy
+
         self.last_move_value = 0
+
+    def predict(self, game_state):
+        encoded_state = self.encoder.encode(game_state)
+        input_tensor = np.array([encoded_state])
+        return self.model.predict(input_tensor)[0]
 
     def set_temperature(self, temperature):
         self.temperature = temperature
@@ -42,32 +42,30 @@ class QAgent(Agent):
         self.policy = policy
 
     def select_move(self, game_state):
-        board_tensor = self.encoder.encode(game_state)
 
-        # Iterate over all legal moves
+        # Loop over all legal moves.
         moves = []
         board_tensors = []
         for move in game_state.legal_moves():
             if not move.is_play:
                 continue
-            # moves is a list of integers
-            moves.append(self.encoder.encode_point(move.point))
+            next_state = game_state.apply_move(move)
+            board_tensor = self.encoder.encode(next_state)
+            moves.append(move)
             board_tensors.append(board_tensor)
         if not moves:
             return goboard.Move.pass_turn()
 
-        # one-hot encode moves
-        num_moves = len(moves)
+        # num_moves = len(moves)
         board_tensors = np.array(board_tensors)
-        move_vectors = np.zeros((num_moves, self.encoder.num_points()))
-        for i, move in enumerate(moves):
-            move_vectors[i][move] = 1
 
-        # pass the board and moves as input to the model
-        values = self.model.predict([board_tensors, move_vectors])
-        values = values.reshape(len(moves))
+        # Values of the next state from opponent's view.
+        opp_values = self.model.predict(board_tensors)
+        opp_values = opp_values.reshape(len(moves))
 
-        # Rank moves
+        # Values from our point of view.
+        values = 1 - opp_values
+
         if self.policy == 'eps-greedy':
             ranked_moves = self.rank_moves_eps_greedy(values)
         elif self.policy == 'weighted':
@@ -75,20 +73,18 @@ class QAgent(Agent):
         else:
             ranked_moves = None
 
-        # Pick the first move that makes sense
         for move_idx in ranked_moves:
-            point = self.encoder.decode_point_index(moves[move_idx])
+            move = moves[move_idx]
             if not is_point_an_eye(game_state.board,
-                                   point,
+                                   move.point,
                                    game_state.next_player):
                 if self.collector is not None:
                     self.collector.record_decision(
                         state=board_tensor,
-                        action=moves[move_idx],
+                        action=self.encoder.encode_point(move.point),
                     )
                 self.last_move_value = float(values[move_idx])
-                return goboard.Move.play(point)
-
+                return move
         # No legal, non-self-destructive moves less.
         return goboard.Move.pass_turn()
 
@@ -115,17 +111,14 @@ class QAgent(Agent):
         self.model.compile(loss='mse', optimizer=opt)
 
         n = experience.states.shape[0]
-        num_moves = self.encoder.num_points()
+        # num_moves = self.encoder.num_points()
         y = np.zeros((n,))
-        actions = np.zeros((n, num_moves))
         for i in range(n):
-            action = experience.actions[i]
             reward = experience.rewards[i]
-            actions[i][action] = 1
             y[i] = 1 if reward > 0 else 0
 
         self.model.fit(
-            [experience.states, actions], y,
+            experience.states, y,
             batch_size=batch_size,
             epochs=1)
 
@@ -141,7 +134,7 @@ class QAgent(Agent):
         return {'value': self.last_move_value}
 
 
-def load_q_agent(h5file):
+def load_value_agent(h5file):
     model = kerasutil.load_model_from_hdf5_group(h5file['model'])
     encoder_name = h5file['encoder'].attrs['name']
     if not isinstance(encoder_name, str):
@@ -151,4 +144,4 @@ def load_q_agent(h5file):
     encoder = encoders.get_encoder_by_name(
         encoder_name,
         (board_width, board_height))
-    return QAgent(model, encoder)
+    return ValueAgent(model, encoder)

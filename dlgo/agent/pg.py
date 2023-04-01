@@ -23,6 +23,7 @@ def normalize(x):
 class PolicyAgent(Agent):
     """
     An agent that uses a deep policy network to select moves.
+    The model input is the board state and the output is the chosen move but with 1 or -1 (win or lose result).
     """
     def __init__(self, model, encoder):
         Agent.__init__(self)

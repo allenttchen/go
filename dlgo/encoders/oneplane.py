@@ -51,14 +51,3 @@ class OnePlaneEncoder(Encoder):
 
 def create(board_size):
     return OnePlaneEncoder(board_size)
-
-
-
-
-
-
-
-
-
-
-
